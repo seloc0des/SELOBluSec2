@@ -1,0 +1,43 @@
+# /etc/pam.d/blusec2-auth  —  BluSec 2.0 PAM stack example
+#
+# Copy (or symlink) this file to /etc/pam.d/ and @include it from the
+# service file you want to protect (sudo, login, sshd, etc.).
+#
+# Prerequisites:
+#   1. BluSec2 installed system-wide:  sudo pip install /path/to/blusec2
+#   2. Device paired:                  sudo blusec2 --mode setup ...
+#   3. User enrolled:                  sudo blusec2 --mode enroll --user <user>
+#
+# ──────────────────────────────────────────────────────────────────────
+# OPTION A — BluSec2 required (no fallback)
+#
+#   If the trusted device is not nearby or the password is wrong,
+#   authentication fails completely.
+#
+#   auth  required  pam_exec.so  expose_authtok  /usr/local/bin/blusec2-pam
+#
+# ──────────────────────────────────────────────────────────────────────
+# OPTION B — BluSec2 sufficient, password fallback (recommended)
+#
+#   If BluSec2 succeeds (device nearby + correct password), skip the
+#   normal password prompt.  If it fails, fall back to standard
+#   unix password authentication.
+#
+auth  [success=1 default=ignore]  pam_exec.so  expose_authtok  /usr/local/bin/blusec2-pam
+auth  required                    pam_unix.so  try_first_pass
+#
+# ──────────────────────────────────────────────────────────────────────
+# OPTION C — BluSec2 as additional factor (MFA)
+#
+#   Standard password must succeed AND BluSec2 must succeed.
+#
+#   auth  required  pam_unix.so
+#   auth  required  pam_exec.so  /usr/local/bin/blusec2-pam
+#
+#   Note: In MFA mode, omit expose_authtok — BluSec2 only checks
+#   proximity (the password was already verified by pam_unix).
+# ──────────────────────────────────────────────────────────────────────
+
+# Environment overrides (optional):
+#   BLUSEC2_CONFIG_DIR=/etc/blusec2   — config directory
+#   BLUSEC2_TIMEOUT=30                — auth timeout in seconds

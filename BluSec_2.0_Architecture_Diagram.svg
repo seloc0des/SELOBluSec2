@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="1200" height="900">
+  <defs>
+    <style>
+      .box { fill: #e3f2fd; stroke: #1976d2; stroke-width: 2; }
+      .header { fill: #1976d2; }
+      .text { font-family: Arial, sans-serif; font-size: 14px; fill: #000; }
+      .title { font-size: 18px; font-weight: bold; fill: #fff; }
+      .arrow { stroke: #666; stroke-width: 2; fill: none; marker-end: url(#arrowhead); }
+      .label { font-size: 12px; fill: #666; }
+      .highlight { fill: #fff3e0; stroke: #f57c00; stroke-width: 2; }
+    </style>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#666" />
+    </marker>
+  </defs>
+  
+  <!-- Title -->
+  <text x="600" y="40" class="text" style="font-size: 24px; font-weight: bold; text-anchor: middle;">BluSec 2.0 Architecture</text>
+  <text x="600" y="65" class="text" style="font-size: 16px; text-anchor: middle;">Proximity-Derived Ephemeral Key Authentication System</text>
+  
+  <!-- User -->
+  <circle cx="100" cy="200" r="40" fill="#4caf50" stroke="#2e7d32" stroke-width="2"/>
+  <text x="100" y="205" class="text" style="fill: #fff; font-weight: bold; text-anchor: middle;">USER</text>
+  
+  <!-- Trusted Device (Phone/ESP32) -->
+  <g>
+    <rect x="250" y="150" width="200" height="150" class="box"/>
+    <rect x="250" y="150" width="200" height="30" class="header"/>
+    <text x="350" y="170" class="title" text-anchor="middle">Trusted Device</text>
+    <text x="260" y="200" class="text">• ESP32 / Mobile App</text>
+    <text x="260" y="220" class="text">• Stores master_key</text>
+    <text x="260" y="240" class="text">• BLE GATT Client</text>
+    <text x="260" y="260" class="text">• Challenge verifier</text>
+    <text x="260" y="280" class="text">• Response generator</text>
+  </g>
+  
+  <!-- BLE Connection -->
+  <path d="M 150 200 L 250 220" class="arrow"/>
+  <text x="180" y="200" class="label">Physical proximity</text>
+  <text x="180" y="215" class="label">(BLE range)</text>
+  
+  <!-- Gate Server -->
+  <g>
+    <rect x="550" y="100" width="250" height="250" class="box"/>
+    <rect x="550" y="100" width="250" height="30" class="header"/>
+    <text x="675" y="120" class="title" text-anchor="middle">Gate Server</text>
+    <text x="560" y="150" class="text">• Linux PC / Server</text>
+    <text x="560" y="170" class="text">• BLE GATT Server</text>
+    <text x="560" y="190" class="text">• Challenge generator</text>
+    <text x="560" y="210" class="text">• Response verifier</text>
+    <text x="560" y="230" class="text">• RSSI proximity check</text>
+    <text x="560" y="250" class="text">• Ephemeral key derivation</text>
+    <text x="560" y="270" class="text">• Password verification</text>
+    <text x="560" y="290" class="text">• PAM integration</text>
+    <text x="560" y="310" class="text">• Bleak library</text>
+  </g>
+  
+  <!-- Challenge-Response Flow -->
+  <path d="M 450 220 L 550 220" class="arrow"/>
+  <text x="480" y="210" class="label" style="font-size: 11px;">1. Challenge</text>
+  <path d="M 550 240 L 450 240" class="arrow" style="marker-end: url(#arrowhead); marker-start: none;"/>
+  <text x="480" y="255" class="label" style="font-size: 11px;">2. Response</text>
+  
+  <!-- Key Manager -->
+  <g>
+    <rect x="900" y="150" width="250" height="150" class="highlight"/>
+    <rect x="900" y="150" width="250" height="30" style="fill: #f57c00;"/>
+    <text x="1025" y="170" class="title" text-anchor="middle">Key Manager</text>
+    <text x="910" y="200" class="text">• ECDH key exchange</text>
+    <text x="910" y="220" class="text">• Master key derivation</text>
+    <text x="910" y="240" class="text">• Ephemeral key (HKDF)</text>
+    <text x="910" y="260" class="text">• Time-synchronized</text>
+    <text x="910" y="280" class="text">• 11-second rotation</text>
+  </g>
+  
+  <path d="M 800 225 L 900 225" class="arrow"/>
+  <text x="820" y="215" class="label" style="font-size: 11px;">Derive ephemeral</text>
+  <text x="820" y="230" class="label" style="font-size: 11px;">encryption key</text>
+  
+  <!-- Storage -->
+  <g>
+    <rect x="550" y="420" width="250" height="120" class="box"/>
+    <rect x="550" y="420" width="250" height="30" class="header"/>
+    <text x="675" y="440" class="title" text-anchor="middle">Secure Storage</text>
+    <text x="560" y="470" class="text">• Encrypted password hashes</text>
+    <text x="560" y="490" class="text">• Master key (encrypted)</text>
+    <text x="560" y="510" class="text">• Device pairing info</text>
+    <text x="560" y="530" class="text">• /etc/blusec2/</text>
+  </g>
+  
+  <path d="M 675 350 L 675 420" class="arrow"/>
+  <text x="685" y="390" class="label" style="font-size: 11px;">Read/Write</text>
+  
+  <!-- Authentication Flow -->
+  <g>
+    <rect x="50" y="650" width="1100" height="230" style="fill: #f5f5f5; stroke: #666; stroke-width: 2;"/>
+    <text x="600" y="675" class="text" style="font-size: 16px; font-weight: bold; text-anchor: middle;">Authentication Flow</text>
+    
+    <!-- Flow steps -->
+    <g>
+      <!-- Step 1 -->
+      <rect x="70" y="700" width="150" height="60" style="fill: #e8f5e9; stroke: #4caf50; stroke-width: 2;"/>
+      <text x="145" y="720" class="text" style="text-anchor: middle; font-weight: bold;">1. Proximity Check</text>
+      <text x="75" y="740" class="text" style="font-size: 11px;">• BLE discovery</text>
+      <text x="75" y="755" class="text" style="font-size: 11px;">• RSSI ≥ -70 dBm</text>
+      
+      <!-- Step 2 -->
+      <rect x="240" y="700" width="150" height="60" style="fill: #e3f2fd; stroke: #2196f3; stroke-width: 2;"/>
+      <text x="315" y="720" class="text" style="text-anchor: middle; font-weight: bold;">2. Challenge</text>
+      <text x="245" y="740" class="text" style="font-size: 11px;">• Generate random</text>
+      <text x="245" y="755" class="text" style="font-size: 11px;">• Sign with HMAC</text>
+      
+      <!-- Step 3 -->
+      <rect x="410" y="700" width="150" height="60" style="fill: #e3f2fd; stroke: #2196f3; stroke-width: 2;"/>
+      <text x="485" y="720" class="text" style="text-anchor: middle; font-weight: bold;">3. Response</text>
+      <text x="415" y="740" class="text" style="font-size: 11px;">• Verify challenge</text>
+      <text x="415" y="755" class="text" style="font-size: 11px;">• HMAC response</text>
+      
+      <!-- Step 4 -->
+      <rect x="580" y="700" width="150" height="60" style="fill: #fff3e0; stroke: #ff9800; stroke-width: 2;"/>
+      <text x="655" y="720" class="text" style="text-anchor: middle; font-weight: bold;">4. Derive Key</text>
+      <text x="585" y="740" class="text" style="font-size: 11px;">• HKDF ephemeral</text>
+      <text x="585" y="755" class="text" style="font-size: 11px;">• Time-bound</text>
+      
+      <!-- Step 5 -->
+      <rect x="750" y="700" width="150" height="60" style="fill: #fce4ec; stroke: #e91e63; stroke-width: 2;"/>
+      <text x="825" y="720" class="text" style="text-anchor: middle; font-weight: bold;">5. Password</text>
+      <text x="755" y="740" class="text" style="font-size: 11px;">• User input</text>
+      <text x="755" y="755" class="text" style="font-size: 11px;">• Decrypt hash</text>
+      
+      <!-- Step 6 -->
+      <rect x="920" y="700" width="150" height="60" style="fill: #e8f5e9; stroke: #4caf50; stroke-width: 2;"/>
+      <text x="995" y="720" class="text" style="text-anchor: middle; font-weight: bold;">6. Grant Access</text>
+      <text x="925" y="740" class="text" style="font-size: 11px;">• Verify password</text>
+      <text x="925" y="755" class="text" style="font-size: 11px;">• Allow/Deny</text>
+      
+      <!-- Arrows between steps -->
+      <path d="M 220 730 L 240 730" class="arrow"/>
+      <path d="M 390 730 L 410 730" class="arrow"/>
+      <path d="M 560 730 L 580 730" class="arrow"/>
+      <path d="M 730 730 L 750 730" class="arrow"/>
+      <path d="M 900 730 L 920 730" class="arrow"/>
+    </g>
+    
+    <!-- Timeline -->
+    <text x="600" y="800" class="text" style="text-anchor: middle; font-weight: bold;">⏱ Time Window: 11 seconds</text>
+    <rect x="300" y="810" width="600" height="20" style="fill: none; stroke: #666; stroke-width: 1;"/>
+    <rect x="300" y="810" width="200" height="20" style="fill: #4caf50; opacity: 0.3;"/>
+    <text x="400" y="824" class="text" style="font-size: 10px; text-anchor: middle;">Current window (valid)</text>
+    <rect x="500" y="810" width="400" height="20" style="fill: #f44336; opacity: 0.3;"/>
+    <text x="700" y="824" class="text" style="font-size: 10px; text-anchor: middle;">Expired (new key required)</text>
+    
+    <!-- Security note -->
+    <text x="600" y="855" class="text" style="text-anchor: middle; font-size: 12px; fill: #d32f2f; font-weight: bold;">🔒 Forward Secrecy: Old keys cannot decrypt new sessions</text>
+  </g>
+  
+  <!-- Legend -->
+  <g>
+    <text x="50" y="600" class="text" style="font-weight: bold;">Security Features:</text>
+    <circle cx="60" cy="615" r="4" fill="#4caf50"/>
+    <text x="70" y="620" class="text" style="font-size: 12px;">Proximity verification (RSSI)</text>
+    
+    <circle cx="270" cy="615" r="4" fill="#2196f3"/>
+    <text x="280" y="620" class="text" style="font-size: 12px;">Cryptographic challenge-response</text>
+    
+    <circle cx="520" cy="615" r="4" fill="#ff9800"/>
+    <text x="530" y="620" class="text" style="font-size: 12px;">Ephemeral key derivation (HKDF)</text>
+    
+    <circle cx="720" cy="615" r="4" fill="#e91e63"/>
+    <text x="730" y="620" class="text" style="font-size: 12px;">AES-256-GCM encryption</text>
+  </g>
+</svg>

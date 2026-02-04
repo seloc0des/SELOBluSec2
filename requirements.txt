@@ -1,0 +1,17 @@
+# BluSec 2.0 - Python Dependencies
+
+# Cryptography
+cryptography>=41.0.0
+
+# Password hashing
+argon2-cffi>=23.0.0
+
+# Bluetooth Low Energy
+bleak>=0.21.0
+bless>=0.2.6
+
+# PAM integration (optional)
+# python-pam>=2.0.0
+
+# Optional: For production deployment
+# python-dotenv>=1.0.0  # Environment variable management

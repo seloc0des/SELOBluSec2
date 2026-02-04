@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "blusec2"
+version = "0.1.0"
+description = "Proximity-derived ephemeral key authentication using BLE and cryptographic challenge-response"
+readme = "README.md"
+license = "LicenseRef-Personal-Use"
+requires-python = ">=3.9"
+authors = [
+    {name = "seloc0des"},
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: Other/Proprietary License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: Security :: Cryptography",
+]
+dependencies = [
+    "cryptography>=41.0.0",
+    "bleak>=0.21.0",
+    "bless>=0.2.6",
+    "argon2-cffi>=23.0.0",
+]
+
+[project.optional-dependencies]
+pam = ["python-pam>=2.0.0"]
+production = [
+    "python-dotenv>=1.0.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+]
+
+[project.scripts]
+blusec2 = "blusec2_auth:cli_main_sync"
+blusec2-pam = "pam_blusec2:pam_main"
+
+[project.urls]
+Homepage = "https://selodev.com/blusec2"
+Repository = "https://github.com/seloc0des/BluSec2"
+
+[tool.setuptools]
+py-modules = [
+    "blusec2_crypto",
+    "blusec2_gate_server",
+    "blusec2_trusted_device",
+    "blusec2_auth",
+    "pam_blusec2",
+]

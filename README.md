@@ -10,11 +10,11 @@
 
 BluSec 2.0 uses two machines: a **gate** (the Linux PC you log into) and a **trusted device** (an ESP32, phone, or second Linux machine with Bluetooth).
 
-1. The gate runs a BLE GATT server and broadcasts a signed challenge (valid for 11-second time windows).
+1. The gate runs a BLE GATT server and generates a fresh signed challenge for each authentication attempt.
 2. The trusted device connects as a GATT client, verifies the challenge signature, and writes back an HMAC response.
-3. The gate verifies the response, checks that the device is physically nearby (RSSI), and derives a session-unique ephemeral key.
+3. The gate verifies the response (using ±1 time-window tolerance for 11-second timestamp boundaries) and derives a session-unique ephemeral key.
 4. The user enters their password, which is verified against an Argon2id hash stored encrypted on disk.
-5. Authentication succeeds only if both the proximity proof and the password are valid.
+5. Authentication succeeds only if both the proximity proof (successful challenge-response over BLE) and the password are valid.
 
 In day-to-day use, this is transparent: when you run `sudo` (or any PAM-configured service), BluSec 2.0 checks for your trusted device over Bluetooth before prompting for your password. If the device is not nearby, authentication is denied before the password prompt.
 
@@ -22,9 +22,9 @@ In day-to-day use, this is transparent: when you run `sudo` (or any PAM-configur
 
 - **Cryptographic Challenge-Response** — HMAC-SHA256 prevents MAC spoofing and replay attacks
 - **Ephemeral Key Derivation** — Session-unique keys derived via HKDF; 11-second time windows provide replay protection
-- **Proximity Verification** — RSSI-based distance checks prevent long-range relay attacks
+- **Proximity Verification** — BLE connection range and successful GATT challenge-response prove device proximity
 - **Forward Secrecy** — Compromised session keys cannot reconstruct past or future sessions
-- **Multi-Factor** — Combines possession (BLE device), knowledge (password), and proximity (RSSI)
+- **Multi-Factor** — Combines possession (BLE device), knowledge (password), and proximity (BLE range)
 - **PAM Integration** — Plugs into sudo, login, sshd, or any PAM-aware service
 
 ## Architecture
@@ -40,8 +40,9 @@ In day-to-day use, this is transparent: when you run `sudo` (or any PAM-configur
   │                                │  4. Verify signature (HMAC)
   │  5. Receive response     ◄─────┤  5. Write response
   │  6. Verify response (HMAC)     │
-  │  7. Derive ephemeral key       │
-  │  8. Check RSSI proximity       │
+  │  7. Verify proximity           │
+  │     (successful GATT exchange) │
+  │  8. Derive ephemeral key       │
   │                                │
   │  9. Decrypt password hash      │
   │     (AES-256-GCM)              │
@@ -323,7 +324,7 @@ journalctl -t pam_blusec2 --no-pager -n 20
 | Remote brute force | Requires physical BLE device | Complete |
 | MAC spoofing | HMAC challenge-response with shared key | Complete |
 | Replay attacks | Timestamp-bound 11-second response windows | Complete |
-| Long-range relay | RSSI threshold verification (-70 dBm default) | High |
+| Long-range relay | BLE connection range (typically <10m) + GATT challenge-response | Moderate-High |
 | Password capture | Password unusable without BLE proximity | High |
 | Cryptanalysis | NIST P-256, HKDF-SHA256, AES-256-GCM, Argon2id | High |
 
@@ -331,10 +332,10 @@ journalctl -t pam_blusec2 --no-pager -n 20
 
 1. Enable PIN/biometric on the trusted Bluetooth device
 2. Store the master key in an HSM if available (currently stored as a file with `0600` permissions)
-3. Tune the RSSI threshold for your environment (`-70 dBm` is a good starting point)
-4. Monitor syslog for `pam_blusec2` audit entries
-5. Keep system clocks synchronized (NTP) on both gate and device
-6. Maintain a backup authentication method (PAM Option B) in case of device loss
+3. Monitor syslog for `pam_blusec2` audit entries
+4. Keep system clocks synchronized (NTP) on both gate and device
+5. Maintain a backup authentication method (PAM Option B) in case of device loss
+6. Use Bluetooth Low Energy (BLE 4.0+) which has limited range (typically <10m) for proximity security
 
 ## Troubleshooting
 
@@ -345,7 +346,8 @@ Run pairing first: `sudo blusec2 --mode setup --device-address ... --device-id .
 - Verify the device is powered on and the BLE client is running
 - Confirm the BLE MAC address matches: `hciconfig hci0 | grep "BD Address"`
 - Check that Bluetooth is up: `sudo systemctl status bluetooth`
-- Try moving the device closer (within ~2 meters for the default -70 dBm threshold)
+- Ensure the device is within BLE range (typically <10 meters, varies by adapter)
+- Check that the trusted device is connecting to the correct gate MAC address
 
 **"Invalid challenge response"**
 - Verify the master key is identical on both sides

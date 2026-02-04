@@ -190,7 +190,21 @@ class BluSec2GateServer:
             )
 
     async def challenge_rotation_task(self, interval: int = CHALLENGE_INTERVAL):
-        """Background task to rotate challenges every *interval* seconds."""
+        """
+        Background task to rotate challenges every *interval* seconds.
+
+        WARNING: Do NOT run this task concurrently with wait_for_authentication()
+        for single auth requests, as it can cause race conditions where the
+        challenge changes between snapshot and verification. Each call to
+        wait_for_authentication() generates its own fresh challenge.
+
+        This task is only useful for:
+        - Long-running GATT servers handling multiple concurrent connections
+        - Pre-rotating challenges before auth requests arrive
+        - Testing time-window based replay protection
+
+        For typical PAM/CLI usage, do NOT start this task.
+        """
         while True:
             await asyncio.sleep(interval)
             await self._rotate_challenge()
@@ -254,6 +268,7 @@ class BluSec2GateServer:
         self,
         device_address: str,
         timeout: float = 30.0,
+        skip_proximity_scan: bool = True,
     ) -> tuple[bool, Optional[bytes]]:
         """
         Wait for a trusted device to complete challenge-response.
@@ -262,8 +277,11 @@ class BluSec2GateServer:
         reads the Challenge characteristic, and writes a response.
 
         Args:
-            device_address: BLE MAC address of trusted device.
+            device_address: BLE MAC address of trusted device (for logging).
             timeout: Seconds to wait for a response write.
+            skip_proximity_scan: Skip active scanning for device advertisements.
+                                The ability to complete the GATT challenge-response
+                                itself proves proximity (default: True).
 
         Returns:
             Tuple of (success, ephemeral_key).
@@ -272,15 +290,20 @@ class BluSec2GateServer:
             "Waiting for authentication from %s", device_address
         )
 
-        # Step 1: Check proximity
-        is_close, rssi = await self.verify_proximity(device_address)
-        if not is_close:
-            self.logger.warning(
-                "Proximity check failed: RSSI %.0f < %d",
-                rssi,
-                self.rssi_threshold,
-            )
-            return False, None
+        # Step 1: Optional proximity scan (DEPRECATED)
+        # The trusted device acts as a GATT client and typically doesn't
+        # advertise, so this scan will fail unless the device implements
+        # separate advertising. Connection-based proximity (successful
+        # GATT response) is sufficient for most deployments.
+        if not skip_proximity_scan:
+            is_close, rssi = await self.verify_proximity(device_address)
+            if not is_close:
+                self.logger.warning(
+                    "Proximity check failed: RSSI %.0f < %d",
+                    rssi,
+                    self.rssi_threshold,
+                )
+                return False, None
 
         # Step 2: Clear state before rotating challenge to avoid race condition
         self.auth_event.clear()
@@ -331,7 +354,8 @@ class BluSec2GateServer:
         )
 
         self.logger.info(
-            "Authentication successful — ephemeral key derived"
+            "Authentication successful — ephemeral key derived "
+            "(proximity verified via successful GATT challenge-response)"
         )
         return True, ephemeral_key
 
@@ -360,13 +384,16 @@ async def main():
     loop = asyncio.get_running_loop()
     await gate.start(loop)
 
-    rotation_task = asyncio.create_task(gate.challenge_rotation_task())
+    # NOTE: challenge_rotation_task() is NOT started here to avoid race
+    # conditions during authentication. Each call to wait_for_authentication()
+    # generates a fresh challenge, which is sufficient for single auth attempts.
+    # Only start the background rotation task if you need to handle multiple
+    # concurrent auth requests or want to rotate challenges independently.
 
     print("BluSec 2.0 Gate GATT Server Started")
     print("=" * 50)
     print(f"Device ID: {device_id.decode()}")
     print(f"RSSI Threshold: {RSSI_THRESHOLD} dBm")
-    print(f"Challenge interval: 11 seconds")
     print()
 
     try:
@@ -384,7 +411,6 @@ async def main():
     except KeyboardInterrupt:
         print("\nShutting down...")
     finally:
-        rotation_task.cancel()
         await gate.stop()
 
 

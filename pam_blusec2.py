@@ -31,6 +31,7 @@ import logging
 import logging.handlers
 import os
 import sys
+import select
 from typing import Optional
 
 from blusec2_auth import BluSec2Authenticator
@@ -68,13 +69,27 @@ def _setup_logging() -> logging.Logger:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-def _read_password() -> Optional[str]:
+def _read_password(timeout: float = 0.5) -> Optional[str]:
     """Read password from stdin (passed by pam_exec expose_authtok).
 
     pam_exec writes the password as a single line on stdin when the
-    ``expose_authtok`` option is set.
+    ``expose_authtok`` option is set. If expose_authtok is NOT set
+    (e.g., PAM Option C for MFA), stdin will have no data and this
+    function returns None after the timeout.
+
+    Args:
+        timeout: Seconds to wait for stdin data (default: 0.5).
+
+    Returns:
+        Password string if available, None otherwise.
     """
     try:
+        # Check if stdin has data available within timeout
+        ready, _, _ = select.select([sys.stdin], [], [], timeout)
+        if not ready:
+            # No data on stdin - expose_authtok not set
+            return None
+
         # pam_exec sends a NUL-terminated token followed by a newline
         password = sys.stdin.readline().rstrip("\n\x00")
         return password if password else None
@@ -124,13 +139,13 @@ async def _authenticate(
 
     proximity_only = password is None
     try:
-        result = await asyncio.wait_for(
-            auth.authenticate(
-                password=password,
-                prompt=False,
-                proximity_only=proximity_only,
-                timeout=AUTH_TIMEOUT,
-            ),
+        # Note: authenticate() handles its own timeout internally.
+        # We don't wrap it in another wait_for to avoid double timeout
+        # overhead (which would reduce effective auth time).
+        result = await auth.authenticate(
+            password=password,
+            prompt=False,
+            proximity_only=proximity_only,
             timeout=AUTH_TIMEOUT,
         )
         return result

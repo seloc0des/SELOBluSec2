@@ -117,9 +117,10 @@ class BluSec2TrustedDevice:
         """
         Connect to gate GATT server and handle challenge-response.
 
-        Subscribes to challenge notifications.  Validated challenges are
-        placed on an internal queue by handle_challenge(); this coroutine
-        consumes them and writes responses back to the gate.
+        Reads the current challenge, subscribes to challenge notifications,
+        and responds to validated challenges. This eliminates the race
+        condition where the device might miss the initial challenge if it
+        subscribes after the gate has already rotated.
 
         Args:
             gate_address: BLE MAC address of the gate.
@@ -133,6 +134,25 @@ class BluSec2TrustedDevice:
                     CHALLENGE_CHAR_UUID,
                     self.handle_challenge,
                 )
+
+                # CRITICAL: Read the current challenge value to avoid race condition.
+                # If we only subscribe to notifications, we'll miss the challenge
+                # if the gate rotated it before we subscribed.
+                try:
+                    initial_challenge_data = await client.read_gatt_char(
+                        CHALLENGE_CHAR_UUID
+                    )
+                    if initial_challenge_data and len(initial_challenge_data) == 64:
+                        self.logger.info("Read initial challenge value")
+                        # Process it through the same handler as notifications
+                        self.handle_challenge(None, bytearray(initial_challenge_data))
+                    else:
+                        self.logger.warning(
+                            "Initial challenge read returned unexpected length: %d",
+                            len(initial_challenge_data) if initial_challenge_data else 0
+                        )
+                except Exception as e:
+                    self.logger.warning("Failed to read initial challenge: %s", e)
 
                 self.logger.info("Listening for challenges...")
 

@@ -76,7 +76,7 @@ def _read_password() -> Optional[str]:
     """
     try:
         # pam_exec sends a NUL-terminated token followed by a newline
-        password = sys.stdin.readline().rstrip("\n")
+        password = sys.stdin.readline().rstrip("\n\x00")
         return password if password else None
     except Exception:
         return None
@@ -129,6 +129,7 @@ async def _authenticate(
                 password=password,
                 prompt=False,
                 proximity_only=proximity_only,
+                timeout=AUTH_TIMEOUT,
             ),
             timeout=AUTH_TIMEOUT,
         )
@@ -140,7 +141,8 @@ async def _authenticate(
         logger.error("Auth error for user %s: %s", username, exc)
         return False
     finally:
-        await auth.close()
+        if auth is not None:
+            await auth.close()
 
 
 # ---------------------------------------------------------------------------

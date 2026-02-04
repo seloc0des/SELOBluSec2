@@ -74,10 +74,11 @@ fi
 PAM_BIN_PATH="$(command -v "$PAM_BIN")"
 info "Found $PAM_BIN at $PAM_BIN_PATH"
 
-# Step 3: Copy PAM config
+# Step 3: Copy PAM config and rewrite the path to the actual binary location
 cp "$SCRIPT_DIR/blusec2-auth" "$PAM_CONF"
+sed -i "s|/usr/local/bin/blusec2-pam|$PAM_BIN_PATH|g" "$PAM_CONF"
 chmod 644 "$PAM_CONF"
-info "Installed PAM config to $PAM_CONF"
+info "Installed PAM config to $PAM_CONF (using $PAM_BIN_PATH)"
 
 echo
 green "PAM integration installed successfully!"

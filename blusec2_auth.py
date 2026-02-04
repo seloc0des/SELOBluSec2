@@ -119,6 +119,7 @@ class BluSec2Authenticator:
         password: Optional[str] = None,
         prompt: bool = True,
         proximity_only: bool = False,
+        timeout: float = 30.0,
     ) -> bool:
         """
         Complete authentication flow.
@@ -141,6 +142,7 @@ class BluSec2Authenticator:
             password: User password (if not provided and prompt=True, will prompt).
             prompt: Whether to prompt for password if not provided.
             proximity_only: If True, only verify BLE proximity (skip password).
+            timeout: Timeout in seconds for BLE authentication (default: 30.0).
 
         Returns:
             bool: True if authentication successful.
@@ -155,7 +157,7 @@ class BluSec2Authenticator:
 
             # Step 1: Verify proximity via challenge-response
             success, ephemeral_key = await self.gate.wait_for_authentication(
-                self.device_address
+                self.device_address, timeout=timeout
             )
 
             if not success or ephemeral_key is None:

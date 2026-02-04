@@ -22,7 +22,7 @@ from bless import (
 )
 from bleak import BleakScanner  # kept for RSSI proximity checks
 
-from blusec2_crypto import BluSec2Crypto
+from blusec2_crypto import BluSec2Crypto, CHALLENGE_INTERVAL
 
 # UUID for BluSec 2.0 service and characteristics
 BLUSEC2_SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0"
@@ -151,6 +151,7 @@ class BluSec2GateServer:
         """Stop the GATT server."""
         if self.server:
             await self.server.stop()
+            self.server = None
             self.logger.info("BluSec2 Gate GATT server stopped")
 
     # ------------------------------------------------------------------
@@ -188,7 +189,7 @@ class BluSec2GateServer:
                 "Challenge rotated for timestamp %d", self.current_timestamp
             )
 
-    async def challenge_rotation_task(self, interval: int = 11):
+    async def challenge_rotation_task(self, interval: int = CHALLENGE_INTERVAL):
         """Background task to rotate challenges every *interval* seconds."""
         while True:
             await asyncio.sleep(interval)
@@ -216,6 +217,14 @@ class BluSec2GateServer:
             for device in devices:
                 if device.address.upper() == device_address.upper():
                     rssi = device.rssi
+                    # Bleak may report None for RSSI in some cases
+                    if rssi is None:
+                        self.logger.warning(
+                            "Device %s found but RSSI unavailable",
+                            device_address,
+                        )
+                        return False, -999.0
+
                     is_close = rssi >= self.rssi_threshold
 
                     self.logger.info(
@@ -273,12 +282,19 @@ class BluSec2GateServer:
             )
             return False, None
 
-        # Step 2: Fresh challenge so device gets a new one
-        await self._rotate_challenge()
-
-        # Step 3: Wait for device to write its response
+        # Step 2: Clear state before rotating challenge to avoid race condition
         self.auth_event.clear()
         self.last_response = None
+
+        # Step 3: Fresh challenge so device gets a new one
+        # Snapshot the challenge and timestamp to prevent background rotation
+        # from invalidating the response
+        await self._rotate_challenge()
+        async with self.challenge_lock:
+            challenge_snapshot = self.current_challenge
+            timestamp_snapshot = self.current_timestamp
+
+        # Step 4: Wait for device to write its response
 
         try:
             await asyncio.wait_for(self.auth_event.wait(), timeout=timeout)
@@ -291,33 +307,33 @@ class BluSec2GateServer:
             self.logger.warning("Invalid response length")
             return False, None
 
-        # Step 4: Verify response (with ±1 window tolerance for clock drift)
-        async with self.challenge_lock:
-            matched_ts = BluSec2Crypto.find_matching_timestamp(
-                self.master_key,
-                self.current_challenge,
-                response,
-                self.device_id,
-                self.current_timestamp,
-            )
+        # Step 5: Verify response (with ±1 window tolerance for clock drift)
+        # Use snapshots to avoid issues with background challenge rotation
+        matched_ts = BluSec2Crypto.find_matching_timestamp(
+            self.master_key,
+            challenge_snapshot,
+            response,
+            self.device_id,
+            timestamp_snapshot,
+        )
 
-            if matched_ts is None:
-                self.logger.warning("Invalid challenge response")
-                return False, None
+        if matched_ts is None:
+            self.logger.warning("Invalid challenge response")
+            return False, None
 
-            # Step 5: Derive ephemeral key using the matched timestamp
-            ephemeral_key = BluSec2Crypto.derive_ephemeral_key(
-                self.master_key,
-                self.current_challenge,
-                response,
-                self.device_id,
-                matched_ts,
-            )
+        # Step 6: Derive ephemeral key using the matched timestamp
+        ephemeral_key = BluSec2Crypto.derive_ephemeral_key(
+            self.master_key,
+            challenge_snapshot,
+            response,
+            self.device_id,
+            matched_ts,
+        )
 
-            self.logger.info(
-                "Authentication successful — ephemeral key derived"
-            )
-            return True, ephemeral_key
+        self.logger.info(
+            "Authentication successful — ephemeral key derived"
+        )
+        return True, ephemeral_key
 
 
 # ------------------------------------------------------------------

@@ -10,7 +10,7 @@
 
 BluSec 2.0 uses two machines: a **gate** (the Linux PC you log into) and a **trusted device** (an ESP32, phone, or second Linux machine with Bluetooth).
 
-1. The gate runs a BLE GATT server and broadcasts a signed challenge every 11 seconds.
+1. The gate runs a BLE GATT server and broadcasts a signed challenge (valid for 11-second time windows).
 2. The trusted device connects as a GATT client, verifies the challenge signature, and writes back an HMAC response.
 3. The gate verifies the response, checks that the device is physically nearby (RSSI), and derives a session-unique ephemeral key.
 4. The user enters their password, which is verified against an Argon2id hash stored encrypted on disk.
@@ -21,7 +21,7 @@ In day-to-day use, this is transparent: when you run `sudo` (or any PAM-configur
 ## Key Features
 
 - **Cryptographic Challenge-Response** — HMAC-SHA256 prevents MAC spoofing and replay attacks
-- **Ephemeral Key Derivation** — Session-unique keys derived via HKDF; challenges rotate every 11 seconds
+- **Ephemeral Key Derivation** — Session-unique keys derived via HKDF; 11-second time windows provide replay protection
 - **Proximity Verification** — RSSI-based distance checks prevent long-range relay attacks
 - **Forward Secrecy** — Compromised session keys cannot reconstruct past or future sessions
 - **Multi-Factor** — Combines possession (BLE device), knowledge (password), and proximity (RSSI)
@@ -35,7 +35,7 @@ In day-to-day use, this is transparent: when you run `sudo` (or any PAM-configur
   BLE GATT Server (bless)          BLE GATT Client (bleak)
   │                                │
   │  1. Advertise BluSec2 service  │
-  │  2. Rotate challenge (11s)     │
+  │  2. Generate challenge         │
   │ ◄──────────────────────────────┤  3. Connect & read challenge
   │                                │  4. Verify signature (HMAC)
   │  5. Receive response     ◄─────┤  5. Write response

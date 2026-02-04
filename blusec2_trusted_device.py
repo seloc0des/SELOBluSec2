@@ -311,6 +311,27 @@ void challengeNotifyCallback(
 }
 
 // ------------------------------------------------------------------
+// NVS Storage Helper (Implementation Required)
+// ------------------------------------------------------------------
+// TODO: Implement this function to load the 32-byte master_key from encrypted NVS.
+// Example using ESP-IDF NVS API:
+//
+// void load_master_key_from_nvs(uint8_t *master_key) {
+//     nvs_handle_t nvs_handle;
+//     esp_err_t err = nvs_open("blusec2", NVS_READONLY, &nvs_handle);
+//     if (err != ESP_OK) {
+//         Serial.println("ERROR: Failed to open NVS");
+//         return;
+//     }
+//     size_t length = 32;
+//     err = nvs_get_blob(nvs_handle, "master_key", master_key, &length);
+//     nvs_close(nvs_handle);
+//     if (err != ESP_OK || length != 32) {
+//         Serial.println("ERROR: Failed to read master key from NVS");
+//     }
+// }
+
+// ------------------------------------------------------------------
 // Arduino setup / loop
 // ------------------------------------------------------------------
 void setup() {

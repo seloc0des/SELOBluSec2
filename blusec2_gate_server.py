@@ -29,6 +29,7 @@ BLUSEC2_SERVICE_UUID = "12345678-1234-5678-1234-56789abcdef0"
 CHALLENGE_CHAR_UUID = "12345678-1234-5678-1234-56789abcdef1"
 RESPONSE_CHAR_UUID = "12345678-1234-5678-1234-56789abcdef2"
 RSSI_THRESHOLD = -70  # dBm - adjust based on desired proximity
+RSSI_UNAVAILABLE = -999.0  # Sentinel value when RSSI cannot be determined
 
 
 class BluSec2GateServer:
@@ -237,7 +238,7 @@ class BluSec2GateServer:
                             "Device %s found but RSSI unavailable",
                             device_address,
                         )
-                        return False, -999.0
+                        return False, RSSI_UNAVAILABLE
 
                     is_close = rssi >= self.rssi_threshold
 

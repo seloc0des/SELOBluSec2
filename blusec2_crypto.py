@@ -7,6 +7,7 @@ import time
 import hmac
 import hashlib
 import secrets
+import subprocess
 from typing import Optional
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
@@ -17,6 +18,9 @@ from argon2.exceptions import VerifyMismatchError
 
 # Time window for challenge-response (11 seconds)
 CHALLENGE_INTERVAL = 11
+
+# Timestamp tolerance for clock drift (±1 window = ±11 seconds)
+DEFAULT_TIMESTAMP_TOLERANCE = 1
 
 
 class BluSec2Crypto:
@@ -32,10 +36,47 @@ class BluSec2Crypto:
     """
     
     @staticmethod
+    def verify_time_sync() -> tuple[bool, str]:
+        """
+        Check if system time appears synchronized via NTP.
+
+        Checks timedatectl on systemd-based Linux systems. On systems
+        without systemd or when timedatectl is unavailable, returns
+        a warning but doesn't fail.
+
+        Returns:
+            Tuple of (is_synced, message)
+        """
+        try:
+            result = subprocess.run(
+                ['timedatectl', 'show', '--property=NTPSynchronized', '--value'],
+                capture_output=True,
+                text=True,
+                timeout=2.0
+            )
+
+            if result.returncode == 0:
+                ntp_synced = result.stdout.strip().lower() == 'yes'
+                if ntp_synced:
+                    return True, "System clock is NTP-synchronized"
+                else:
+                    return False, "System clock is NOT NTP-synchronized (timedatectl shows 'no')"
+            else:
+                return False, f"timedatectl returned error code {result.returncode}"
+
+        except FileNotFoundError:
+            # timedatectl not available (non-systemd system)
+            return True, "Warning: timedatectl not available, cannot verify NTP sync"
+        except subprocess.TimeoutExpired:
+            return False, "timedatectl command timed out"
+        except Exception as e:
+            return True, f"Warning: Could not verify NTP sync: {e}"
+
+    @staticmethod
     def get_current_timestamp() -> int:
         """
         Get current time window (11-second intervals)
-        
+
         Returns:
             int: Current timestamp divided by CHALLENGE_INTERVAL
         """

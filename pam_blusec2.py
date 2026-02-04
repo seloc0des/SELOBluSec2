@@ -69,7 +69,7 @@ def _setup_logging() -> logging.Logger:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-def _read_password(timeout: float = 0.5) -> Optional[str]:
+def _read_password(timeout: float = 2.0) -> Optional[str]:
     """Read password from stdin (passed by pam_exec expose_authtok).
 
     pam_exec writes the password as a single line on stdin when the
@@ -78,7 +78,8 @@ def _read_password(timeout: float = 0.5) -> Optional[str]:
     function returns None after the timeout.
 
     Args:
-        timeout: Seconds to wait for stdin data (default: 0.5).
+        timeout: Seconds to wait for stdin data (default: 2.0).
+                 Increased from 0.5s to accommodate slow systems and I/O contention.
 
     Returns:
         Password string if available, None otherwise.

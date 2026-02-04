@@ -18,11 +18,11 @@ from blusec2_gate_server import BluSec2GateServer
 class BluSec2Authenticator:
     """
     Complete authentication flow orchestrator
-    
+
     Manages the entire authentication process from proximity verification
     through password validation
     """
-    
+
     def __init__(
         self,
         config_dir: str = "/etc/blusec2",
@@ -30,7 +30,7 @@ class BluSec2Authenticator:
     ):
         """
         Initialize authenticator
-        
+
         Args:
             config_dir: Directory containing configuration and keys
             user: Username to authenticate
@@ -47,10 +47,10 @@ class BluSec2Authenticator:
         self.master_key = self._load_master_key()
         self.device_id = self._load_device_id()
         self.device_address = self._load_device_address()
-        
+
         # Initialize gate server
         self.gate = BluSec2GateServer(self.master_key, self.device_id)
-    
+
     @staticmethod
     def _validate_username(username: str):
         """Reject usernames with path-traversal or unsafe characters."""
@@ -58,6 +58,16 @@ class BluSec2Authenticator:
             raise ValueError(
                 f"Invalid username '{username}': "
                 "only alphanumeric, dot, underscore, and hyphen are allowed"
+            )
+
+    @staticmethod
+    def _validate_mac_address(address: str):
+        """Validate BLE MAC address format."""
+        # Accept both colon and hyphen separators (AA:BB:CC:DD:EE:FF or AA-BB-CC-DD-EE-FF)
+        if not re.fullmatch(r'([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}', address):
+            raise ValueError(
+                f"Invalid MAC address '{address}': "
+                "expected format AA:BB:CC:DD:EE:FF or AA-BB-CC-DD-EE-FF"
             )
 
     def _load_master_key(self) -> bytes:
@@ -79,16 +89,29 @@ class BluSec2Authenticator:
         return key
     
     def _load_device_id(self) -> bytes:
-        """Load trusted device ID"""
+        """Load trusted device ID with length validation"""
         device_file = self.config_dir / "device_id.txt"
-        
+
         if not device_file.exists():
             raise FileNotFoundError(f"Device ID not found at {device_file}")
-        
+
         with open(device_file, 'r') as f:
             device_id = f.read().strip()
-        
-        return device_id.encode('utf-8')
+
+        # Validate device ID
+        if not device_id:
+            raise ValueError("Device ID cannot be empty")
+
+        device_id_bytes = device_id.encode('utf-8')
+
+        if len(device_id_bytes) > 255:
+            raise ValueError(
+                f"Device ID too long: {len(device_id_bytes)} bytes (max 255). "
+                "The device ID is included in HMAC calculations and must match "
+                "exactly between gate and device."
+            )
+
+        return device_id_bytes
     
     def _load_device_address(self) -> str:
         """Load trusted device BLE address"""
@@ -215,6 +238,8 @@ class BluSec2Authenticator:
             return True
 
         except Exception as e:
+            # Clear ephemeral key on failure to prevent key reuse
+            self.session_ephemeral_key = None
             self.logger.error("Authentication error: %s", e, exc_info=True)
             print(f"Authentication failed: {e}")
             return False
@@ -248,16 +273,27 @@ class BluSec2SetupManager:
     ) -> tuple[bytes, bytes]:
         """
         Perform initial ECDH pairing with trusted device
-        
+
         Args:
             device_address: BLE MAC address of device
             device_id: Unique identifier for device
-            
+
         Returns:
             Tuple of (master_key, device_id_bytes)
         """
+        # Validate device ID before pairing
+        if not device_id:
+            raise ValueError("Device ID cannot be empty")
+
+        device_id_bytes = device_id.encode('utf-8')
+        if len(device_id_bytes) > 255:
+            raise ValueError(
+                f"Device ID too long: {len(device_id_bytes)} bytes (max 255). "
+                "Use a shorter identifier."
+            )
+
         self.logger.info("Starting pairing with device: %s", device_address)
-        
+
         # Generate gate keypair
         gate_private, gate_public = BluSec2Crypto.generate_ecdh_keypair()
         gate_public_bytes = BluSec2Crypto.serialize_public_key(gate_public)
@@ -301,22 +337,23 @@ class BluSec2SetupManager:
         self.config_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
         
         # Save master key (encrypted in production)
+        # Use os.open with secure permissions to avoid race condition
         key_file = self.config_dir / "master_key.bin"
-        with open(key_file, 'wb') as f:
+        fd = os.open(key_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'wb') as f:
             f.write(master_key)
-        os.chmod(key_file, 0o600)
         
         # Save device ID
         device_id_file = self.config_dir / "device_id.txt"
-        with open(device_id_file, 'w') as f:
+        fd = os.open(device_id_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'w') as f:
             f.write(device_id.decode('utf-8'))
-        os.chmod(device_id_file, 0o600)
         
         # Save device address
         addr_file = self.config_dir / "device_address.txt"
-        with open(addr_file, 'w') as f:
+        fd = os.open(addr_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'w') as f:
             f.write(device_address)
-        os.chmod(addr_file, 0o600)
         
         self.logger.info("Pairing configuration saved to %s", self.config_dir)
     
@@ -365,11 +402,11 @@ class BluSec2SetupManager:
             password_hash_bytes, master_key
         )
 
-        # Save encrypted hash
+        # Save encrypted hash with secure permissions
         hash_file = hash_dir / f"{username}.bin"
-        with open(hash_file, "wb") as f:
+        fd = os.open(hash_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'wb') as f:
             f.write(encrypted_hash)
-        os.chmod(hash_file, 0o600)
 
         self.logger.info("User %s enrolled successfully", username)
         print(f"User {username} enrolled")
@@ -419,7 +456,30 @@ async def cli_main():
         if not args.device_address or not args.device_id:
             print("Error: --device-address and --device-id required for setup")
             return 1
-        
+
+        # Validate MAC address format
+        try:
+            BluSec2Authenticator._validate_mac_address(args.device_address)
+        except ValueError as e:
+            print(f"Error: {e}")
+            return 1
+
+        # Verify clock synchronization (critical for 11-second time windows)
+        is_synced, sync_msg = BluSec2Crypto.verify_time_sync()
+        print(f"Clock sync check: {sync_msg}")
+        if not is_synced and "Warning" not in sync_msg:
+            print()
+            print("ERROR: System clock must be NTP-synchronized for BluSec2 to work correctly.")
+            print("The challenge-response protocol uses 11-second time windows.")
+            print()
+            print("To enable NTP sync on systemd-based Linux:")
+            print("  sudo timedatectl set-ntp true")
+            print()
+            return 1
+        elif not is_synced:
+            print("WARNING: Could not verify NTP sync. Ensure clocks are synchronized on both gate and device.")
+            print()
+
         setup = BluSec2SetupManager(args.config_dir)
         master_key, device_id = await setup.perform_pairing(
             args.device_address,

@@ -255,11 +255,11 @@ class BluSec2GateServer:
             self.logger.warning(
                 "Device %s not found in scan", device_address
             )
-            return False, -999.0
+            return False, RSSI_UNAVAILABLE
 
         except Exception as e:
             self.logger.error("RSSI check failed: %s", e)
-            return False, -999.0
+            return False, RSSI_UNAVAILABLE
 
     # ------------------------------------------------------------------
     # Authentication flow
